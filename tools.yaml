@@ -1,0 +1,131 @@
+# tools.yaml
+
+# --- Data Source ---
+kind: source
+name: clinic-db
+type: sqlite
+database: ${DB_PATH}
+
+---
+# --- Tool 1: Search clinic services by category and/or appointment type ---
+kind: tool
+name: search-services
+type: sqlite-sql
+source: clinic-db
+description: >-
+  Search for dental clinic services by service category and/or appointment type.
+  Use this tool when the user wants to browse services by category
+  (e.g., Preventive, Restorative, Cosmetic, Surgical, Orthodontic, Periodontic,
+  Diagnostic, Emergency) or filter by appointment type (e.g., Routine, Specialized,
+  Emergency). Both parameters accept an empty string to match all values.
+statement: |
+  SELECT name, service_category, appointment_type, duration, price, tags, available
+  FROM clinic_services
+  WHERE ($1 = '' OR LOWER(service_category) = LOWER($1))
+  AND ($2 = '' OR LOWER(appointment_type) LIKE '%' || LOWER($2) || '%')
+  ORDER BY name
+  LIMIT 10
+parameters:
+  - name: service_category
+    type: string
+    description: "The service category to filter by (e.g., 'Preventive', 'Restorative', 'Cosmetic', 'Surgical', 'Orthodontic', 'Periodontic', 'Diagnostic', 'Emergency'). Use empty string for all categories."
+  - name: appointment_type
+    type: string
+    description: "The appointment type to filter by (e.g., 'Routine', 'Specialized', 'Emergency'). Use empty string for all types."
+
+---
+# --- Tool 2: Get full details for a specific clinic service ---
+kind: tool
+name: get-service-details
+type: sqlite-sql
+source: clinic-db
+description: >-
+  Get full details for a specific dental service including its description,
+  duration, price, tags, and availability. Use this tool when the
+  user asks about a particular treatment or procedure by name or category.
+statement: |
+  SELECT name, service_category, appointment_type, duration, price, tags, available, description
+  FROM clinic_services
+  WHERE LOWER(name) LIKE '%' || LOWER($1) || '%'
+  OR LOWER(service_category) LIKE '%' || LOWER($1) || '%'
+parameters:
+  - name: search_term
+    type: string
+    description: "The service name or category to look up (partial match supported)."
+
+---
+# --- Embedding Model ---
+kind: embeddingModel
+name: gemini-embedding
+type: gemini
+model: gemini-embedding-001
+apiKey: ${GOOGLE_API_KEY}
+dimension: 3072
+
+---
+# --- Tool 3: Semantic search by description ---
+kind: tool
+name: search-services-by-description
+type: sqlite-sql
+source: clinic-db
+description: >-
+  Find dental services that match a natural language description of what the user
+  is looking for. Use this tool when the user describes their dental needs
+  using symptoms, goals, or preferences rather than a specific category or service name.
+  Examples: "my teeth hurt and I think I have an infection," "I want whiter teeth,"
+  "something for my child's first dental visit," "I grind my teeth at night."
+statement: |
+  SELECT name, service_category, appointment_type, duration, price, tags, description
+  FROM clinic_services
+  WHERE description_embedding IS NOT NULL
+  ORDER BY description_embedding <=> $1
+  LIMIT 5
+parameters:
+  - name: search_query
+    type: string
+    description: "A natural language description of the dental service or treatment the user is looking for."
+    embeddedBy: gemini-embedding
+
+---
+# --- Tool 4: Add a new clinic service with automatic embedding ---
+kind: tool
+name: add-service
+type: sqlite-sql
+source: clinic-db
+description: >-
+  Add a new dental service to the clinic. Use this tool when a user asks
+  to add a treatment or procedure that is not currently offered.
+statement: |
+  INSERT INTO clinic_services (name, service_category, appointment_type, duration, price, tags, available, description, description_embedding)
+  VALUES ($1, $2, $3, $4, $5, $6, CAST($7 AS INTEGER), $8, $9)
+  RETURNING name, service_category
+parameters:
+  - name: name
+    type: string
+    description: "The service name (e.g., 'Dental Sealants')."
+  - name: service_category
+    type: string
+    description: "The service category (e.g., 'Preventive', 'Restorative', 'Cosmetic', 'Surgical', 'Orthodontic', 'Periodontic', 'Diagnostic', 'Emergency')."
+  - name: appointment_type
+    type: string
+    description: "The appointment type (e.g., 'Routine', 'Specialized', 'Emergency')."
+  - name: duration
+    type: string
+    description: "Estimated duration (e.g., '45 minutes', '60-90 minutes', '2 visits, 60 minutes each')."
+  - name: price
+    type: string
+    description: "The price (e.g., '$120')."
+  - name: tags
+    type: string
+    description: "Service tags (e.g., 'Insurance Eligible, Child-Friendly')."
+  - name: available
+    type: string
+    description: "Whether the service is currently available (true or false)."
+  - name: description
+    type: string
+    description: "A short description of the service (2-3 sentences)."
+  - name: description_vector
+    type: string
+    description: "Auto-generated embedding vector for the service description."
+    valueFromParam: description
+    embeddedBy: gemini-embedding
