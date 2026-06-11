@@ -8,6 +8,7 @@ An intelligent, conversational AI receptionist agent designed to assist patients
 - 🔍 **Semantic Search:** Patients can describe symptoms or dental goals in natural language to find the most relevant treatments.
 - 💰 **Detailed Service Info:** Provides complete details including pricing, duration, and insurance eligibility.
 - 🛠️ **Service Management:** Integrated tools to add or update clinic services dynamically.
+- 📅 **Appointment Management:** Patients can book, check, and cancel dental appointments using their phone number as an identifier.
 - 🤖 **Empathetic AI:** Designed to be conversational, caring, and professional.
 
 ## 🛠️ Tech Stack
@@ -80,6 +81,7 @@ python scripts/test_invoke.py
 ## 📂 Project Structure
 
 - `clinic_agent/`: Contains the core agent definition and instructions.
+- `reservation_agent/`: Handles patient appointments (booking, cancellation, lookups).
 - `database/`: Local storage for clinic data.
 - `logs/`: Directory for log files.
 - `scripts/`: Helper scripts for data seeding and testing.
