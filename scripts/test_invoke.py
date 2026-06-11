@@ -16,9 +16,11 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from clinic_agent.agent import root_agent
+# from reservation_agent.agent import root_agent
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 APP_NAME    = "clinic_agent"
+# APP_NAME    = "reservation_agent"
 USER_ID     = "user_001"
 SESSION_ID  = "session_001"
 
@@ -66,7 +68,7 @@ async def invoke_agent(user_message: str) -> str:
 
 
 async def main():
-    print("=== Clinic Agent Tester ===")
+    print("=== Agent Tester ===")
     print("Type 'exit' to quit.\n")
 
     while True:
