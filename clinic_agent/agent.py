@@ -1,15 +1,47 @@
 import os
+import httpx
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from google.adk.agents import LlmAgent
+from google import genai
+from google.genai import types
+from functools import cached_property
 from toolbox_adk import ToolboxToolset
+from google.adk.agents import LlmAgent
+from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
+from google.adk.models.google_llm import Gemini
 
 TOOLBOX_URL = os.environ.get("TOOLBOX_URL", "http://127.0.0.1:5000")
+RESERVATION_AGENT_CARD_URL = os.environ.get(
+    "RESERVATION_AGENT_CARD_URL",
+    "http://localhost:8001/.well-known/agent.json"  # ← default lokal
+)
 
 toolbox = ToolboxToolset(TOOLBOX_URL)
+
+class GeminiGlobal(Gemini):
+    """Gemini using Google API Key instead of Vertex AI credentials."""
+
+    @cached_property
+    def api_client(self) -> genai.Client:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        return genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                headers=self._tracking_headers(),
+                retry_options=self.retry_options,
+            ),
+        )
+
+
+reservation_remote_agent = RemoteA2aAgent(
+    name="reservation_agent",
+    description="Handles dental appointment reservations — create, check, and cancel bookings.",
+    agent_card=RESERVATION_AGENT_CARD_URL,
+    httpx_client=httpx.AsyncClient(timeout=60),  # ← hapus auth, tidak perlu lokal
+)
 
 root_agent = LlmAgent(
     name="clinic_agent",
@@ -28,4 +60,5 @@ When in doubt between search-services and search-services-by-description, prefer
 If a service is not available (available is false), let the patient know and suggest similar alternatives from the search results.
 Be conversational, caring, and concise.""",
     tools=[toolbox],
+    sub_agents=[reservation_remote_agent],
 )
