@@ -2,8 +2,10 @@
 
 import asyncio
 import os
+import re
 import sys
 import httpx
+from html import escape
 
 from telegram import Update
 from telegram.constants import ChatAction
@@ -29,6 +31,17 @@ if not TOKEN:
     print("Error: TELEGRAM_BOT_TOKEN environment variable not set.")
     print("Please set it before running the application.")
     sys.exit(1)
+
+def md_to_html(text: str) -> str:
+    """Convert basic markdown to Telegram HTML (bold, italic, code, headers)."""
+    text = escape(text)
+    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    text = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'<i>\1</i>', text)
+    text = re.sub(r'_([^_\n]+)_', r'<i>\1</i>', text)
+    text = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', text)
+    text = re.sub(r'^#{1,6}\s+(.+)$', r'<b>\1</b>', text, flags=re.MULTILINE)
+    return text
+
 
 async def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
@@ -115,7 +128,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         await typing_task
 
     # Send the final response back to the user
-    await update.message.reply_text(reply_text)
+    await update.message.reply_text(md_to_html(reply_text), parse_mode='HTML')
 
 def main() -> None:
     """Start the bot."""
